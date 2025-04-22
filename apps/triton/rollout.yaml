@@ -25,7 +25,7 @@ spec:
             - -c
             - |
               echo "Activating service account..."
-              gcloud auth activate-service-account --key-file=/secrets/key.json
+              gcloud auth activate-service-account --key-file=/secrets/eminent-cache-456900-t9-6e636af0d847.json
               gsutil -m cp -r gs://your-bucket-name/models/* /models/
           volumeMounts:
             - name: model-repo
