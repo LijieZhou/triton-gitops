@@ -2,27 +2,51 @@ apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
   name: triton-rollout
-  namespace: triton
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: triton
+  strategy:
+    canary:
+      steps:
+        - setWeight: 50
+        - pause: { duration: 30s }
   template:
     metadata:
       labels:
         app: triton
     spec:
+      initContainers:
+        - name: sync-models
+          image: google/cloud-sdk:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Activating service account..."
+              gcloud auth activate-service-account --key-file=/secrets/key.json
+              gsutil -m cp -r gs://your-bucket-name/models/* /models/
+          volumeMounts:
+            - name: model-repo
+              mountPath: /models
+            - name: gcp-sa
+              mountPath: /secrets
+              readOnly: true
       containers:
         - name: triton
-          image: nginx:1.27   # Replace with your image
+          image: nvcr.io/nvidia/tritonserver:24.04-py3
+          args: ["tritonserver", "--model-repository=/models"]
           ports:
-            - containerPort: 8080
-  strategy:
-    canary:
-      steps:
-        - setWeight: 25
-        - pause: {duration: 30s}
-        - setWeight: 50
-        - pause: {}
-        - setWeight: 100
+            - containerPort: 8000
+            - containerPort: 8001
+          volumeMounts:
+            - name: model-repo
+              mountPath: /models
+      volumes:
+        - name: model-repo
+          persistentVolumeClaim:
+            claimName: triton-model-pvc
+        - name: gcp-sa
+          secret:
+            secretName: gcs-sa-secret
